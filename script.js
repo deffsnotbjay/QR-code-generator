@@ -37,7 +37,7 @@ let userLogo = null;
 // Initialization
 styleSection.style.opacity = '0.5';
 styleSection.style.pointerEvents = 'none'; 
-loadSavedQRs(); // Load saved items on start
+loadSavedQRs(); 
 
 // 1. Tab Switching
 textTab.addEventListener('click', () => switchTab('text'));
@@ -66,11 +66,9 @@ processBtn.addEventListener('click', () => {
   qrPlaceholder.style.display = 'none';
   
   styleSection.classList.add('visible');
-  
   if(window.innerWidth < 768) {
       styleSection.scrollIntoView({ behavior: 'smooth' });
   }
-  
   createOrUpdateQR();
 });
 
@@ -90,7 +88,7 @@ logoInput.addEventListener('change', (e) => {
   }
 });
 
-// 4. Core Logic
+// 4. Core Logic - UPDATED FOR SCANNABILITY
 function createOrUpdateQR() {
   const containerWidth = document.querySelector('.right-panel').offsetWidth;
   const sizeInput = parseInt(sizeRange.value, 10);
@@ -102,8 +100,13 @@ function createOrUpdateQR() {
   const qrOptions = {
       width: finalSize,
       height: finalSize,
+      // Margin is key for scanners
+      margin: 10,
       data: lastDataValue,
       image: userLogo,
+      qrOptions: { 
+          errorCorrectionLevel: 'H' 
+      },
       dotsOptions: { 
           color: qrColor.value, 
           type: activePattern 
@@ -152,9 +155,24 @@ function handleStyleClick(e, container) {
   createOrUpdateQR();
 }
 
-// 6. Download
-downloadBtn.addEventListener('click', () => {
-  if (qr) qr.download({ name: "my-qr-code", extension: "png" });
+// 6. Download - HIGH RES FIX
+downloadBtn.addEventListener('click', async () => {
+  if (!qr) return;
+  
+  // 1. Temporarily resize QR logic to High Res (2000px)
+  const oldSize = parseInt(sizeRange.value, 10); // current slider value
+  
+  // Force update to high resolution
+  qr.update({ width: 2000, height: 2000 });
+  
+  // 2. Download
+  await qr.download({ name: "qr-code", extension: "png" });
+
+  // 3. Revert back to preview size
+  // Note: We need to calc correct preview size again (container width logic)
+  const containerWidth = document.querySelector('.right-panel').offsetWidth;
+  const finalSize = Math.min(oldSize, containerWidth - 40);
+  qr.update({ width: finalSize, height: finalSize });
 });
 
 // 7. Save Logic
@@ -185,10 +203,7 @@ saveBtn.addEventListener('click', async () => {
 function loadSavedQRs() {
   const savedItems = JSON.parse(localStorage.getItem('savedQRs') || "[]");
   savedList.innerHTML = '';
-  
-  // Filter out old bad data if any
   const validItems = savedItems.filter(item => item.id !== undefined);
-  
   validItems.forEach(item => renderSavedItem(item, false)); 
   checkEmptyState();
 }
@@ -199,7 +214,6 @@ function renderSavedItem(item, prepend = true) {
   card.dataset.id = item.id;
   
   const displayText = item.text.length > 20 ? item.text.substring(0, 20) + '...' : item.text;
-  // Escape single quotes for HTML attribute
   const safeText = item.text.replace(/'/g, "\\'");
 
   card.innerHTML = `
@@ -261,7 +275,6 @@ window.confirmDelete = function() {
 
 function checkEmptyState() {
   const savedItems = JSON.parse(localStorage.getItem('savedQRs') || "[]");
-  // Also filter valid items here for the count
   const validItems = savedItems.filter(item => item.id !== undefined);
   
   if (validItems.length > 0) {
